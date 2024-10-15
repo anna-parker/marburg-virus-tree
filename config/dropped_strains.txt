@@ -1,0 +1,4 @@
+NC_001608.3 #reference
+OK573192.1 #too diverged
+M36065.1 #too diverged
+OP729425.1 #too diverged
