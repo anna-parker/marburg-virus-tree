@@ -9,7 +9,7 @@ dependencies:
   - pip
   - PyYAML
   - python-dateutil
-  - pytz
   - snakemake
   - ncbi-datasets-cli >=16.29.0
   - augur
+  - click

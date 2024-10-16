@@ -19,3 +19,5 @@ Note that I had to fix the root to `mid_point` when calling augur refine - this 
 I additionally set the clock rate as there is limited collection date information and when estimated during timetree inference it sometimes was estimated to be negative and otherwise was typically in the magnitude of 7e-05 (8e-06 std) leading to date inference in the years 3000. 
 
 TODO: Figure out why augur curate format-dates is not working - then the `year-bounds` argument in agur-refine should lead to better time estimates, additionally we can use the ncbiUploadDate as an upper time bound for collectionDate. 
+
+To give better time estimates I create time bounds using the ncbiReleaseDate as an upper bound and a lower bound of 1980. I add these in the [format expected by treetime](https://github.com/neherlab/treetime/blob/master/treetime/argument_parser.py#L84) - for some reason the format [lower_bound:upper_bound] is not working, for now I just pass the upper_bound. This gives me reasonable time estimates. 

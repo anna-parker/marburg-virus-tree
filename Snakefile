@@ -26,7 +26,7 @@ COLUMN_MAPPING = {
     "Is Complete": "ncbiIsComplete",
     "Is Lab Host": "ncbiIsLabHost",
     "Is Vaccine Strain": "ncbiIsVaccineStrain",
-    "Isolate Collection date": "date",
+    "Isolate Collection date": "ncbiCollectionDate",
     "Isolate Lineage": "ncbiIsolateName",
     "Isolate Lineage source": "ncbiIsolateSource",
     "Lab Host": "ncbiLabHost",
@@ -50,12 +50,11 @@ COLUMN_MAPPING = {
     "Virus Infraspecific Names Strain": "ncbiVirusStrain",
     "Virus Name": "ncbiVirusName",
     "Virus Pangolin Classification": "ncbiVirusPangolin",
-    "Virus Taxonomic ID": "ncbiVirusTaxId"
+    "Virus Taxonomic ID": "ncbiVirusTaxId",
 }
 
 
 # TODO: replace this with `augur curate rename`
-# ` augur curate parse-genbank-location` and then `augur curate apply-geolocation-rules`
 def rename_columns(input_file, output_file, mapping=COLUMN_MAPPING):
     with open(input_file, "r") as f:
         header = f.readline().strip().split("\t")
@@ -100,6 +99,7 @@ rule format_ncbi_dataset_report:
             > {output.ncbi_dataset_tsv}
         """
 
+
 rule rename_columns:
     input:
         ncbi_dataset_tsv="data/metadata_post_extract.tsv",
@@ -112,16 +112,32 @@ rule rename_columns:
             input.ncbi_dataset_tsv, output.ncbi_dataset_tsv, mapping=params.mapping
         )
 
+
 rule curate_metadata_geolocation:
     input:
         metadata="data/metadata_post_rename.tsv",
     output:
         precurated_metadata="data/pre_metadata_curated.tsv",
-        curated_metadata="data/metadata_curated.tsv",
+        curated_metadata="data/geoloc_metadata_curated.tsv",
     shell:
         """
         augur curate parse-genbank-location --metadata {input.metadata} --location-field='ncbiGeoLocation' --output-metadata {output.precurated_metadata}
         augur curate apply-geolocation-rules --metadata {output.precurated_metadata} --geolocation-rules config/gisaid_geoLocationRules.tsv --output-metadata {output.curated_metadata} --region-field='ncbiGeoRegion'
+        """
+
+
+rule curate_dates:
+    input:
+        metadata="data/geoloc_metadata_curated.tsv",
+    output:
+        curated_metadata="data/metadata_curated.tsv",
+    shell:
+        """
+        python scripts/curate_dates.py --input-metadata {input.metadata} \
+            --output-metadata {output.curated_metadata} \
+            --collection-date-field='ncbiCollectionDate' \
+            --upper-bound-field='ncbiReleaseDate' \
+            --output-field='date'
         """
 
 
@@ -132,7 +148,7 @@ rule filter:
         """
     input:
         sequences="data/sequences.fasta",
-        metadata=rules.curate_metadata_geolocation.output.curated_metadata,
+        metadata=rules.curate_dates.output.curated_metadata,
         exclude=dropped_strains,
     output:
         filtered_sequences="data/filtered_sequences.fasta",
@@ -196,16 +212,14 @@ rule refine:
     input:
         tree=rules.tree.output.tree,
         alignment=rules.align.output,
-        metadata=rules.curate_metadata_geolocation.output.curated_metadata,
+        metadata=rules.curate_dates.output.curated_metadata,
     output:
         tree="data/tree.nwk",
         node_data="data/branch_lengths.json",
     params:
         coalescent="opt",
         date_inference="marginal",
-        clock_rate=0.0009, #set clock rate to avoid inference issues
-        clock_std_dev=0.00045,
-        root="mid_point", #needed to have RAVN as an outgroup
+        root="mid_point",  #needed to have RAVN as an outgroup
     shell:
         """
         augur refine \
@@ -217,12 +231,7 @@ rule refine:
             --metadata-id-columns genbankAccession \
             --coalescent {params.coalescent} \
             --root {params.root} \
-            --clock-rate {params.clock_rate} \
-            --clock-std-dev {params.clock_std_dev} \
-            --timetree \
-            --year-bounds 0 2024\
-            --date-confidence \
-            --date-inference {params.date_inference}
+            --timetree --max-iter 5 --use-fft\
         """
 
 
@@ -272,7 +281,7 @@ rule traits:
         "Inferring ancestral traits for {params.columns!s}"
     input:
         tree=rules.refine.output.tree,
-        metadata=rules.curate_metadata_geolocation.output.curated_metadata,
+        metadata=rules.curate_dates.output.curated_metadata,
     output:
         node_data="data/traits.json",
     params:
@@ -294,7 +303,7 @@ rule export:
         "Exporting data files for for auspice"
     input:
         tree=rules.refine.output.tree,
-        metadata=rules.curate_metadata_geolocation.output.curated_metadata,
+        metadata=rules.curate_dates.output.curated_metadata,
         branch_lengths=rules.refine.output.node_data,
         traits=rules.traits.output.node_data,
         nt_muts=rules.ancestral.output.node_data,
