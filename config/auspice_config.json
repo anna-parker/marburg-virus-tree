@@ -28,7 +28,7 @@
         "type": "categorical"
       },
       {
-        "key": "region",
+        "key": "ncbiGeoRegion",
         "title": "Region",
         "type": "categorical"
       },
@@ -40,7 +40,7 @@
     ],
     "geo_resolutions": [
       "country",
-      "region"
+      "ncbiGeoRegion"
     ],
     "panels": [
       "tree",
@@ -52,7 +52,7 @@
     },
     "filters": [
       "country",
-      "region",
+      "ncbiGeoRegion",
       "author"
     ]
   }

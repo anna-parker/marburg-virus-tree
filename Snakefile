@@ -26,7 +26,7 @@ COLUMN_MAPPING = {
     "Is Complete": "ncbiIsComplete",
     "Is Lab Host": "ncbiIsLabHost",
     "Is Vaccine Strain": "ncbiIsVaccineStrain",
-    "Isolate Collection date": "ncbiCollectionDate",
+    "Isolate Collection date": "date",
     "Isolate Lineage": "ncbiIsolateName",
     "Isolate Lineage source": "ncbiIsolateSource",
     "Lab Host": "ncbiLabHost",
@@ -39,7 +39,7 @@ COLUMN_MAPPING = {
     "SRA Accessions": "ncbiSraAccessions",
     "Submitter Affiliation": "ncbiSubmitterAffiliation",
     "Submitter Country": "ncbiSubmitterCountry",
-    "Submitter Names": "ncbiSubmitterNames",
+    "Submitter Names": "author",
     "Update date": "ncbiUpdateDate",
     "Virus Common Name": "ncbiVirusCommonName",
     "Virus Infraspecific Names Breed": "ncbiVirusBreed",
@@ -112,6 +112,19 @@ rule rename_columns:
             input.ncbi_dataset_tsv, output.ncbi_dataset_tsv, mapping=params.mapping
         )
 
+rule curate_metadata_geolocation:
+    input:
+        metadata="data/metadata_post_rename.tsv",
+    output:
+        precurated_metadata="data/pre_metadata_curated.tsv",
+        curated_metadata="data/metadata_curated.tsv",
+    shell:
+        """
+        augur curate parse-genbank-location --metadata {input.metadata} --location-field='ncbiGeoLocation' --output-metadata {output.precurated_metadata}
+        augur curate apply-geolocation-rules --metadata {output.precurated_metadata} --geolocation-rules config/gisaid_geoLocationRules.tsv --output-metadata {output.curated_metadata} --region-field='ncbiGeoRegion'
+        """
+
+
 rule filter:
     message:
         """
@@ -119,7 +132,7 @@ rule filter:
         """
     input:
         sequences="data/sequences.fasta",
-        metadata="data/metadata_post_rename.tsv",
+        metadata=rules.curate_metadata_geolocation.output.curated_metadata,
         exclude=dropped_strains,
     output:
         filtered_sequences="data/filtered_sequences.fasta",
@@ -184,7 +197,7 @@ rule refine:
     input:
         tree=rules.tree.output.tree,
         alignment=rules.align.output,
-        metadata="data/metadata_post_rename.tsv",
+        metadata=rules.curate_metadata_geolocation.output.curated_metadata,
     output:
         tree="data/tree.nwk",
         node_data="data/branch_lengths.json",
@@ -200,7 +213,10 @@ rule refine:
             --metadata {input.metadata} \
             --output-tree {output.tree} \
             --output-node-data {output.node_data} \
-            --metadata-id-columns genbankAccession
+            --metadata-id-columns genbankAccession \
+            --coalescent {params.coalescent} \
+            --date-confidence \
+            --date-inference {params.date_inference} \
         """
 
 
@@ -250,11 +266,11 @@ rule traits:
         "Inferring ancestral traits for {params.columns!s}"
     input:
         tree=rules.refine.output.tree,
-        metadata="data/metadata_post_rename.tsv",
+        metadata=rules.curate_metadata_geolocation.output.curated_metadata,
     output:
         node_data="data/traits.json",
     params:
-        columns="ncbiVirusTaxId",
+        columns="ncbiVirusTaxId country ncbiGeoRegion",
     shell:
         """
         augur traits \
@@ -272,7 +288,7 @@ rule export:
         "Exporting data files for for auspice"
     input:
         tree=rules.refine.output.tree,
-        metadata="data/metadata_post_rename.tsv",
+        metadata=rules.curate_metadata_geolocation.output.curated_metadata,
         branch_lengths=rules.refine.output.node_data,
         traits=rules.traits.output.node_data,
         nt_muts=rules.ancestral.output.node_data,
@@ -287,8 +303,9 @@ rule export:
         augur export v2 \
             --tree {input.tree} \
             --metadata {input.metadata} \
-            --node-data {input.branch_lengths} {input.traits} {input.nt_muts} {input.aa_mut} \
+            --node-data {input.branch_lengths} {input.traits} {input.nt_muts} {input.aa_muts} \
             --auspice-config {input.auspice_config} \
             --output {output.auspice_json} \
+            --include-root-sequence \
             --metadata-id-columns {params.id_column}
         """
