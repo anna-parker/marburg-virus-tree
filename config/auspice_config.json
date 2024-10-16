@@ -34,7 +34,7 @@
       },
       {
         "key": "ncbiVirusTaxId",
-        "title": "Clade",
+        "title": "VirusTaxonId",
         "type": "categorical"
       }
     ],
