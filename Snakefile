@@ -131,7 +131,7 @@ rule curate_metadata_dates:
         curated_metadata="data/metadata_curated.tsv",
     shell:
         """
-        augur curate format-dates --metadata {input.metadata)--date-fields "date" --output-metadata {output.metadata} --failure-reporting warn
+        augur curate format-dates --metadata {input.metadata} --date-fields "date" --output-metadata {output.curated_metadata} --failure-reporting warn
         """
 
 rule filter:
