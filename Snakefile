@@ -192,7 +192,6 @@ rule refine:
           - estimate timetree
           - use {params.coalescent} coalescent timescale
           - estimate {params.date_inference} node dates
-          - filter tips more than {params.clock_filter_iqd} IQDs from clock expectation
         """
     input:
         tree=rules.tree.output.tree,
@@ -204,7 +203,9 @@ rule refine:
     params:
         coalescent="opt",
         date_inference="marginal",
-        clock_filter_iqd=4,
+        clock_rate=0.0009, #set clock rate to avoid inference issues
+        clock_std_dev=0.00045,
+        root="mid_point", #needed to have RAVN as an outgroup
     shell:
         """
         augur refine \
@@ -215,8 +216,13 @@ rule refine:
             --output-node-data {output.node_data} \
             --metadata-id-columns genbankAccession \
             --coalescent {params.coalescent} \
+            --root {params.root} \
+            --clock-rate {params.clock_rate} \
+            --clock-std-dev {params.clock_std_dev} \
+            --timetree \
+            --year-bounds 0 2024\
             --date-confidence \
-            --date-inference {params.date_inference} \
+            --date-inference {params.date_inference}
         """
 
 

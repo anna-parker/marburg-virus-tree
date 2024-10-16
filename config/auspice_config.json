@@ -13,9 +13,14 @@
         "type": "categorical"
       },
       {
-        "key": "num_date",
+        "key": "numdate",
         "title": "Date",
         "type": "continuous"
+      },
+      {
+        "key": "raw_date",
+        "title": "Reported Collection Date",
+        "type": "categorical"
       },
       {
         "key": "author",

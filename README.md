@@ -13,3 +13,9 @@ snakemake export
 Initial output can be viewed by pasting the results in the `auspice` folder into: https://auspice.us/.
 
 Sequences contain all sequences downloaded from https://www.ncbi.nlm.nih.gov/labs/virus/vssi/#/virus?SeqType_s=Nucleotide&VirusLineage_ss=Orthomarburgvirus%20marburgense,%20taxid:3052505.
+
+Note that I had to fix the root to `mid_point` when calling augur refine - this is inorder to have the RAVN clade as an outgroup and helps with time tree inference.
+
+I additionally set the clock rate as there is limited collection date information and when estimated during timetree inference it sometimes was estimated to be negative and otherwise was typically in the magnitude of 7e-05 (8e-06 std) leading to date inference in the years 3000. 
+
+TODO: Figure out why augur curate format-dates is not working - then the `year-bounds` argument in agur-refine should lead to better time estimates, additionally we can use the ncbiUploadDate as an upper time bound for collectionDate. 
