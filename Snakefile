@@ -117,13 +117,22 @@ rule curate_metadata_geolocation:
         metadata="data/metadata_post_rename.tsv",
     output:
         precurated_metadata="data/pre_metadata_curated.tsv",
-        curated_metadata="data/metadata_curated.tsv",
+        curated_metadata="data/geoloc_metadata_curated.tsv",
     shell:
         """
         augur curate parse-genbank-location --metadata {input.metadata} --location-field='ncbiGeoLocation' --output-metadata {output.precurated_metadata}
         augur curate apply-geolocation-rules --metadata {output.precurated_metadata} --geolocation-rules config/gisaid_geoLocationRules.tsv --output-metadata {output.curated_metadata} --region-field='ncbiGeoRegion'
         """
 
+rule curate_metadata_dates:
+    input:
+        metadata="data/geoloc_metadata_curated.tsv",
+    output:
+        curated_metadata="data/metadata_curated.tsv",
+    shell:
+        """
+        augur curate format-dates --metadata {input.metadata)--date-fields "date" --output-metadata {output.metadata} --failure-reporting warn
+        """
 
 rule filter:
     message:
