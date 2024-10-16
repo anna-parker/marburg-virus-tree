@@ -208,6 +208,11 @@ rule refine:
           - estimate timetree
           - use {params.coalescent} coalescent timescale
           - estimate {params.date_inference} node dates
+        Papers estimate the clock rate at 3.3e-4 subs/site/year
+        --clock-filter-iqd 4 \
+        --date-confidence \
+        --clock-rate 3.3e-4 \
+        --date-inference {params.date_inference}
         """
     input:
         tree=rules.tree.output.tree,
@@ -230,8 +235,11 @@ rule refine:
             --output-node-data {output.node_data} \
             --metadata-id-columns genbankAccession \
             --coalescent {params.coalescent} \
-            --root {params.root} \
-            --timetree --max-iter 5 --use-fft\
+            --timetree --max-iter 4 \
+            --clock-filter-iqd 4 \
+            --date-confidence \
+            --clock-rate 3.3e-4 \
+            --date-inference {params.date_inference} \
         """
 
 
@@ -275,6 +283,25 @@ rule translate:
             --output-node-data {output.node_data} \
         """
 
+rule clades:
+    message:
+        "Adding internal clade labels"
+    input:
+        tree=rules.refine.output.tree,
+        aa_muts=rules.translate.output.node_data,
+        nuc_muts=rules.ancestral.output.node_data,
+        clades="config/clades.tsv",
+    output:
+        node_data="data/clades_raw.json",
+    shell:
+        """
+        augur clades \
+            --tree {input.tree} \
+            --mutations {input.nuc_muts} {input.aa_muts} \
+            --clades {input.clades} \
+            --output-node-data {output.node_data} 2>&1 | tee {log}
+        """
+
 
 rule traits:
     message:
@@ -309,6 +336,7 @@ rule export:
         nt_muts=rules.ancestral.output.node_data,
         aa_muts=rules.translate.output.node_data,
         auspice_config=auspice_config,
+        clades=rules.clades.output.node_data,
     output:
         auspice_json="auspice/marburg_tree.json",
     params:
@@ -318,7 +346,7 @@ rule export:
         augur export v2 \
             --tree {input.tree} \
             --metadata {input.metadata} \
-            --node-data {input.branch_lengths} {input.traits} {input.nt_muts} {input.aa_muts} \
+            --node-data {input.branch_lengths} {input.traits} {input.nt_muts} {input.aa_muts} {input.clades} \
             --auspice-config {input.auspice_config} \
             --output {output.auspice_json} \
             --include-root-sequence \
