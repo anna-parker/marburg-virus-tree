@@ -69,6 +69,7 @@ def main(
         if record[upper_bound_field]:
             try:
                 parsed_timestamp = dateutil.parse(record[upper_bound_field])
+                #upper_bound = parsed_timestamp.strftime('%Y')
                 upper_bound = f"{parsed_timestamp.strftime('%Y')}-XX-XX"
             except ValueError:
                 continue

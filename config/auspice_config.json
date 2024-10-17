@@ -6,6 +6,17 @@
       }
     ],
     "build_url": "https://github.com/anna-parker/marburg-virus-tree",
+    "extensions": {
+      "nextclade": {
+        "clade_node_attrs": [
+          {
+            "name": "clade_membership",
+            "displayName": "Clade",
+            "description": ""
+          }
+        ]
+      }
+    },
     "colorings": [
       {
         "key": "gt",
@@ -41,6 +52,11 @@
         "key": "ncbiVirusTaxId",
         "title": "VirusTaxonId",
         "type": "categorical"
+      },
+      {
+        "key": "clade_membership",
+        "title": "clade",
+        "type": "categorical"
       }
     ],
     "geo_resolutions": [
@@ -53,11 +69,13 @@
       "entropy"
     ],
     "display_defaults": {
-      "map_triplicate": true
+      "map_triplicate": true,
+      "branch_label": "clade"
     },
     "filters": [
       "country",
       "ncbiGeoRegion",
-      "author"
+      "author",
+      "clade_membership"
     ]
   }

@@ -20,7 +20,7 @@ It uses the paper:
 __Gianguglielmo Zehender, Chiara Sorrentino, Carla Veo, Lisa Fiaschi, Sonia Gioffrè, Erika Ebranati, Elisabetta Tanzi, Massimo Ciccozzi, Alessia Lai, Massimo Galli,
 Distribution of Marburg virus in Africa: An evolutionary approach,
 Infection, Genetics and Evolution__
-for clade names; link [here](https://www.sciencedirect.com/science/article/pii/S1567134816302386?via%3Dihub).
+for clade names; link [here](https://www.sciencedirect.com/science/article/pii/S1567134816302386?via%3Dihub). However, we choose not to show the B.1 clade as with additional samples the grouping is no longer very clear. 
 
 - The clock rate is set to __3.3 × 10−4__ substitutions/site/year (as inferred by Zehender et al.) as there is limited collection date information. Without specifying a clock rate timetree sometimes infers negative clock rate and otherwise infers a clock rate in the magnitude of 7e-05 (8e-06 std). The biggest impact of setting the clock rate is shifting the root from the 1300s (or earlier) to the 1800s. 
 
