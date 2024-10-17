@@ -179,7 +179,6 @@ rule align:
         augur align \
             --sequences {input.sequences} \
             --reference-sequence {input.reference} \
-            --remove-reference\
             --output {output.alignment} \
             --fill-gaps
         """
@@ -235,6 +234,7 @@ rule refine:
             --output-node-data {output.node_data} \
             --metadata-id-columns genbankAccession \
             --coalescent {params.coalescent} \
+            --root {params.root} \
             --timetree --max-iter 4 \
             --clock-filter-iqd 4 \
             --date-confidence \

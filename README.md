@@ -1,8 +1,10 @@
 # marburg-virus-tree
 
-Marburg virus auspice tree built using [NC_001608.3](https://www.ncbi.nlm.nih.gov/nuccore/NC_001608.3) as the reference.
+Nextstrain build of the Orthomarburgvirus marburgense taxon (taxonId: 3052505), with subspecies ravn virus (RAVV) and marburg virus (MARV). Alignments use the official INSDC marburg virus reference sequence [NC_001608.3](https://www.ncbi.nlm.nih.gov/nuccore/NC_001608.3).
 
-Snakemake uses [nextstrain/ebola](https://github.com/nextstrain/ebola) as a template. Build can be run using:
+Initial output can be viewed by pasting the results in the `auspice` folder into: https://auspice.us/.
+
+Alternatively, you can run the build locally with:
 
 ```
 micromamba create -f environment.yml
@@ -10,9 +12,9 @@ micromamba activate marburg-tree
 snakemake export
 ```
 
-Initial output can be viewed by pasting the results in the `auspice` folder into: https://auspice.us/.
+This build uses [nextstrain/ebola](https://github.com/nextstrain/ebola) as a template.
 
-Sequences contain all sequences downloaded from https://www.ncbi.nlm.nih.gov/labs/virus/vssi/#/virus?SeqType_s=Nucleotide&VirusLineage_ss=Orthomarburgvirus%20marburgense,%20taxid:3052505.
+
 
 I use 
 __Gianguglielmo Zehender, Chiara Sorrentino, Carla Veo, Lisa Fiaschi, Sonia Gioffrè, Erika Ebranati, Elisabetta Tanzi, Massimo Ciccozzi, Alessia Lai, Massimo Galli,
