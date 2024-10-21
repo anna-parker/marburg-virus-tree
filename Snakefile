@@ -1,4 +1,5 @@
-reference = "config/reference.gb"
+reference_gff3 = "config/reference.gff3"
+reference = "config/reference.fasta"
 dropped_strains = "config/dropped_strains.txt"
 colors = ("config/colors.tsv",)
 
@@ -271,7 +272,7 @@ rule translate:
     input:
         tree=rules.refine.output.tree,
         node_data=rules.ancestral.output.node_data,
-        reference=reference,
+        reference=reference_gff3,
     output:
         node_data="data/aa_muts.json",
     shell:
