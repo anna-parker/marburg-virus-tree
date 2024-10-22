@@ -36,16 +36,24 @@ def main(
 
     children = data['tree']['children']
 
+    # delete the outgroup
     for i, child in enumerate(children):
-        if child.get('name') == outgroup_name:
+        if child["name"] == outgroup_name:
             del children[i]
-            break  # Stop after deleting the first match
+            break
 
     children = data['tree']['children']
     assert len(children) == 1, f"Expected 1 child, got {len(children)}"
     div = children[0]["node_attrs"]["div"]
-    logger.info(div)
+    time_first_inner_node =  children[0]["node_attrs"]["num_date"]["value"]
+    logger.info(f"First child has div:{div}, shrinking")
+    logger.info(f"First child has time:{time_first_inner_node}, shrinking")
 
+    # shrink long branch to root
+    data['tree']["node_attrs"]["num_date"]["value"] = time_first_inner_node - 10
+    data['tree']["node_attrs"]["num_date"]["confidence"] = [time_first_inner_node - 10, time_first_inner_node]
+
+    # remove div from all children
     def traverse(node):
         if 'children' in node:
             for child in node['children']:
