@@ -1,5 +1,7 @@
 reference_gff3 = "config/reference.gff3"
 reference = "config/reference.fasta"
+outgroup = "config/menglaense_sequence.fasta"
+outgroup_name = "KX371887.3"
 dropped_strains = "config/dropped_strains.txt"
 colors = ("config/colors.tsv",)
 
@@ -142,25 +144,73 @@ rule curate_dates:
         """
 
 
+rule prealign:
+    input:
+        sequences="data/sequences.fasta",
+        reference=reference,
+    output:
+        prealigned_fasta="data/prealigned_sequences.fasta",
+        prealigned_tsv="data/prealigned_nextclade.tsv",
+    shell:
+        """
+        nextclade run \
+        --retry-reverse-complement \
+        --input-ref={input.reference} \
+        --output-fasta={output.prealigned_fasta} \
+        --output-tsv={output.prealigned_tsv} \
+        {input.sequences}
+        """
+
+
 rule filter:
     message:
         """
-        Filtering out reference sequence
+        Filter out dropped strains, sequences with coverage 
+        under 0.1 and sequences that failed prealignment
         """
     input:
         sequences="data/sequences.fasta",
         metadata=rules.curate_dates.output.curated_metadata,
         exclude=dropped_strains,
+        prealigned_fasta="data/prealigned_sequences.fasta",
+        prealigned_tsv="data/prealigned_nextclade.tsv",
     output:
         filtered_sequences="data/filtered_sequences.fasta",
+        filtered_metadata="data/filtered_metadata.tsv",
+    params:
+        min_coverage=0.05,
     shell:
         """
-        augur filter \
-            --sequences {input.sequences} \
+        python scripts/filter.py \
+            --all-sequences {input.sequences} \
+            --all-metadata {input.metadata} \
+            --dropped-strains {input.exclude} \
+            --prealigned-sequences {input.prealigned_fasta} \
+            --prealigned-tsv {input.prealigned_tsv} \
+            --output-sequences {output.filtered_sequences} \
+            --output-metadata {output.filtered_metadata} \
+            --min-coverage {params.min_coverage}
+        """
+
+
+rule add_outgroup:
+    message:
+        "Adding outgroup to metadata"
+    input:
+        outgroup=outgroup,
+        metadata=rules.filter.output.filtered_metadata,
+        sequences=rules.filter.output.filtered_sequences,
+    output:
+        sequences="data/sequences_with_outgroup.fasta",
+        metadata="data/metadata_with_outgroup.tsv",
+    shell:
+        """
+        python scripts/add_outgroup.py \
             --metadata {input.metadata} \
-            --metadata-id-columns "genbankAccession" \
-            --exclude {input.exclude} \
-            --output-sequences {output.filtered_sequences}
+            --sequences {input.sequences} \
+            --outgroup {input.outgroup} \
+            --output-metadata {output.metadata} \
+            --output-sequences {output.sequences}
         """
 
 
@@ -168,10 +218,10 @@ rule align:
     message:
         """
         Aligning sequences to {input.reference}
-          - filling gaps with N with
+          - filling gaps with N
         """
     input:
-        sequences=rules.filter.output.filtered_sequences,
+        sequences=rules.add_outgroup.output.sequences,
         reference=reference,
     output:
         alignment="data/aligned_sequence.fasta",
@@ -209,22 +259,18 @@ rule refine:
           - use {params.coalescent} coalescent timescale
           - estimate {params.date_inference} node dates
         Papers estimate the clock rate at 3.3e-4 subs/site/year
-        --clock-filter-iqd 4 \
-        --date-confidence \
-        --clock-rate 3.3e-4 \
-        --date-inference {params.date_inference}
         """
     input:
         tree=rules.tree.output.tree,
         alignment=rules.align.output,
-        metadata=rules.curate_dates.output.curated_metadata,
+        metadata=rules.add_outgroup.output.metadata,
     output:
         tree="data/tree.nwk",
         node_data="data/branch_lengths.json",
     params:
         coalescent="opt",
         date_inference="marginal",
-        root="mid_point",  #needed to have RAVN as an outgroup
+        root=outgroup_name,  #needed to have RAVN as an outgroup
     shell:
         """
         augur refine \
@@ -237,7 +283,6 @@ rule refine:
             --coalescent {params.coalescent} \
             --root {params.root} \
             --timetree --max-iter 4 \
-            --clock-filter-iqd 4 \
             --date-confidence \
             --clock-rate 3.3e-4 \
             --date-inference {params.date_inference} \
@@ -284,6 +329,7 @@ rule translate:
             --output-node-data {output.node_data} \
         """
 
+
 rule clades:
     message:
         "Adding internal clade labels"
@@ -309,7 +355,7 @@ rule traits:
         "Inferring ancestral traits for {params.columns!s}"
     input:
         tree=rules.refine.output.tree,
-        metadata=rules.curate_dates.output.curated_metadata,
+        metadata=rules.add_outgroup.output.metadata,
     output:
         node_data="data/traits.json",
     params:
@@ -331,7 +377,7 @@ rule export:
         "Exporting data files for for auspice"
     input:
         tree=rules.refine.output.tree,
-        metadata=rules.curate_dates.output.curated_metadata,
+        metadata=rules.add_outgroup.output.metadata,
         branch_lengths=rules.refine.output.node_data,
         traits=rules.traits.output.node_data,
         nt_muts=rules.ancestral.output.node_data,
@@ -339,7 +385,7 @@ rule export:
         auspice_config=auspice_config,
         clades=rules.clades.output.node_data,
     output:
-        auspice_json="auspice/marburg_tree.json",
+        auspice_json="data/marburg_tree.json",
     params:
         id_column="genbankAccession",
     shell:
@@ -352,4 +398,22 @@ rule export:
             --output {output.auspice_json} \
             --include-root-sequence \
             --metadata-id-columns {params.id_column}
+        """
+
+
+rule fix_auspice_tree:
+    message:
+        "Remove outgroup from tree and prune long root branch"
+    input:
+        auspice_tree=rules.export.output.auspice_json,
+    params:
+        outgroup=outgroup_name,
+    output:
+        auspice_tree="auspice/marburg_tree.json",
+    shell:
+        """
+        python scripts/fix_auspice_tree.py \
+            --auspice-tree {input.auspice_tree} \
+            --output-auspice-tree {output.auspice_tree} \
+            --outgroup-name {params.outgroup}
         """
