@@ -1,5 +1,7 @@
 reference_gff3 = "config/reference.gff3"
 reference = "config/reference.fasta"
+outgroup = "config/menglaense_sequence.fasta"
+outgroup_name = "KX371887.3"
 dropped_strains = "config/dropped_strains.txt"
 colors = ("config/colors.tsv",)
 
@@ -142,6 +144,24 @@ rule curate_dates:
         """
 
 
+rule prealign:
+    input:
+        sequences="data/sequences.fasta",
+        reference=reference,
+    output:
+        prealigned_fasta="data/prealigned_sequences.fasta",
+        prealigned_tsv="data/prealigned_nextclade.tsv",
+    shell:
+        """
+        nextclade run \
+        --retry-reverse-complement \
+        --input-ref={input.reference} \
+        --output-fasta={output.prealigned_fasta} \
+        --output-tsv={output.prealigned_tsv} \
+        {input.sequences}
+        """
+
+
 rule filter:
     message:
         """
@@ -173,19 +193,34 @@ rule filter:
         """
 
 
+rule add_outgroup:
+    message:
+        "Adding outgroup to metadata"
+    input:
+        outgroup=outgroup,
+        metadata=rules.filter.output.filtered_metadata,
+        sequences=rules.filter.output.filtered_sequences,
+    output:
+        sequences="data/sequences_with_outgroup.fasta",
+        metadata="data/metadata_with_outgroup.tsv",
+    shell:
+        """
+        python scripts/add_outgroup.py \
+            --metadata {input.metadata} \
+            --sequences {input.sequences} \
+            --outgroup {input.outgroup} \
+            --output-metadata {output.metadata} \
+            --output-sequences {output.sequences}
+        """
+
+
 rule align:
     message:
         """
         Aligning sequences to {input.reference}
-          - filling gaps with N with
-        augur align \
-            --sequences {input.sequences} \
-            --reference-sequence {input.reference} \
-            --output {output.alignment} \
-            --fill-gaps
         """
     input:
-        sequences=rules.filter.output.filtered_sequences,
+        sequences=rules.add_outgroup.output.sequences,
         reference=reference,
     output:
         alignment="data/aligned_sequence.fasta",
@@ -194,8 +229,11 @@ rule align:
         nextclade run \
         --min-seed-cover=0.01 \
         --kmer-length=7 \
-        --kmer-distance=2 \
         --allowed-mismatches=10 \
+        --penalty-gap-open=18 \
+        --penalty-gap-open-in-frame=18 \
+        --penalty-gap-open-out-of-frame=18 \
+        --gap-alignment-side=left \
         --retry-reverse-complement \
         --input-ref={input.reference} \
         --output-fasta={output.alignment} \
@@ -215,12 +253,12 @@ rule tree:
         """
         augur tree \
             --alignment {input.alignment} \
-            --tree-builder-args="-czb" \
+            --tree-builder-args="-czb -o KX371887.3"\
             --output {output.tree}
         """
 
 
-rule refine:
+rule prerefine:
     message:
         """
         Refining tree
@@ -228,22 +266,18 @@ rule refine:
           - use {params.coalescent} coalescent timescale
           - estimate {params.date_inference} node dates
         Papers estimate the clock rate at 3.3e-4 subs/site/year
-        --clock-filter-iqd 4 \
-        --date-confidence \
-        --clock-rate 3.3e-4 \
-        --date-inference {params.date_inference}
         """
     input:
         tree=rules.tree.output.tree,
         alignment=rules.align.output,
-        metadata=rules.curate_dates.output.curated_metadata,
+        metadata=rules.add_outgroup.output.metadata,
     output:
-        tree="data/tree.nwk",
-        node_data="data/branch_lengths.json",
+        tree="data/pre_tree.nwk",
+        node_data="data/pre_branch_lengths.json",
     params:
         coalescent="opt",
         date_inference="marginal",
-        root="mid_point",  #needed to have RAVN as an outgroup
+        root=outgroup_name,  #needed to have RAVN as an outgroup
     shell:
         """
         augur refine \
@@ -256,7 +290,91 @@ rule refine:
             --coalescent {params.coalescent} \
             --root {params.root} \
             --timetree --max-iter 4 \
-            --clock-filter-iqd 4 \
+            --date-confidence \
+            --clock-rate 3.3e-4 \
+            --date-inference {params.date_inference} \
+        """
+
+
+rule preancestral:
+    message:
+        "Reconstructing ancestral sequences and mutations"
+    input:
+        tree=rules.prerefine.output.tree,
+        alignment=rules.align.output,
+        reference=reference,
+    output:
+        node_data="data/pre_nt_muts.json",
+    params:
+        inference="joint",
+    shell:
+        """
+        augur ancestral \
+            --tree {input.tree} \
+            --alignment {input.alignment} \
+            --output-node-data {output.node_data} \
+            --root-sequence {input.reference} \
+            --inference {params.inference}
+        """
+
+
+rule prune_root:
+    message:
+        "Pruning outgroup and root branch"
+    input:
+        tree=rules.prerefine.output.tree,
+        alignment=rules.align.output,
+        metadata=rules.add_outgroup.output.metadata,
+        node_data=rules.preancestral.output.node_data,
+        scripts="scripts/prune_root.py",
+    output:
+        tree="data/tree_pruned.nwk",
+        alignment="data/aligned_sequences_pruned.fasta",
+        metadata="data/metadata_pruned.tsv",
+    shell:
+        """
+        python {input.scripts} \
+            --tree {input.tree} \
+            --outgroup-name {outgroup_name} \
+            --sequences {input.alignment} \
+            --metadata {input.metadata} \
+            --reconstructed-alignments {input.node_data} \
+            --output-tree {output.tree} \
+            --output-sequences {output.alignment} \
+            --output-metadata {output.metadata} \
+        """
+
+
+rule refine:
+    message:
+        """
+        Refining tree
+          - estimate timetree
+          - use {params.coalescent} coalescent timescale
+          - estimate {params.date_inference} node dates
+        Papers estimate the clock rate at 3.3e-4 subs/site/year
+        """
+    input:
+        tree=rules.prune_root.output.tree,
+        alignment=rules.prune_root.output.alignment,
+        metadata=rules.prune_root.output.metadata,
+    output:
+        tree="data/tree.nwk",
+        node_data="data/branch_lengths.json",
+    params:
+        coalescent="opt",
+        date_inference="marginal",
+    shell:
+        """
+        augur refine \
+            --tree {input.tree} \
+            --alignment {input.alignment} \
+            --metadata {input.metadata} \
+            --output-tree {output.tree} \
+            --output-node-data {output.node_data} \
+            --metadata-id-columns genbankAccession \
+            --coalescent {params.coalescent} \
+            --timetree --max-iter 4 \
             --date-confidence \
             --clock-rate 3.3e-4 \
             --date-inference {params.date_inference} \
@@ -268,7 +386,7 @@ rule ancestral:
         "Reconstructing ancestral sequences and mutations"
     input:
         tree=rules.refine.output.tree,
-        alignment=rules.align.output,
+        alignment=rules.prune_root.output.alignment,
         reference=reference,
     output:
         node_data="data/nt_muts.json",
@@ -303,6 +421,7 @@ rule translate:
             --output-node-data {output.node_data} \
         """
 
+
 rule clades:
     message:
         "Adding internal clade labels"
@@ -328,7 +447,7 @@ rule traits:
         "Inferring ancestral traits for {params.columns!s}"
     input:
         tree=rules.refine.output.tree,
-        metadata=rules.curate_dates.output.curated_metadata,
+        metadata=rules.prune_root.output.metadata,
     output:
         node_data="data/traits.json",
     params:
@@ -350,7 +469,7 @@ rule export:
         "Exporting data files for for auspice"
     input:
         tree=rules.refine.output.tree,
-        metadata=rules.curate_dates.output.curated_metadata,
+        metadata=rules.prune_root.output.metadata,
         branch_lengths=rules.refine.output.node_data,
         traits=rules.traits.output.node_data,
         nt_muts=rules.ancestral.output.node_data,
@@ -358,7 +477,7 @@ rule export:
         auspice_config=auspice_config,
         clades=rules.clades.output.node_data,
     output:
-        auspice_json="auspice/marburg_tree.json",
+        auspice_json="data/marburg_tree.json",
     params:
         id_column="genbankAccession",
     shell:
@@ -371,4 +490,21 @@ rule export:
             --output {output.auspice_json} \
             --include-root-sequence \
             --metadata-id-columns {params.id_column}
+        """
+
+rule fix_auspice_tree:
+    message:
+        "Rename root"
+    input:
+        auspice_tree=rules.export.output.auspice_json,
+    params:
+        outgroup=outgroup_name,
+    output:
+        auspice_tree="auspice/marburg_tree.json",
+    shell:
+        """
+        python scripts/fix_auspice_tree.py \
+            --auspice-tree {input.auspice_tree} \
+            --output-auspice-tree {output.auspice_tree} \
+            --outgroup-name {params.outgroup}
         """
