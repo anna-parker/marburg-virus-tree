@@ -2,6 +2,8 @@ reference_gff3 = "config/reference.gff3"
 reference = "config/reference.fasta"
 outgroup = "config/menglaense_sequence.fasta"
 outgroup_name = "KX371887.3"
+#outgroup = "config/ebola_zaire.fasta"
+#outgroup_name = "NC_002549.1"
 dropped_strains = "config/dropped_strains.txt"
 colors = ("config/colors.tsv",)
 
@@ -178,7 +180,7 @@ rule filter:
         filtered_sequences="data/filtered_sequences.fasta",
         filtered_metadata="data/filtered_metadata.tsv",
     params:
-        min_coverage=0.05,
+        min_coverage=0.1,
     shell:
         """
         python scripts/filter.py \
@@ -218,7 +220,6 @@ rule align:
     message:
         """
         Aligning sequences to {input.reference}
-          - filling gaps with N
         """
     input:
         sequences=rules.add_outgroup.output.sequences,
@@ -227,11 +228,16 @@ rule align:
         alignment="data/aligned_sequence.fasta",
     shell:
         """
-        augur align \
-            --sequences {input.sequences} \
-            --reference-sequence {input.reference} \
-            --output {output.alignment} \
-            --fill-gaps
+        nextclade run \
+        --min-seed-cover=0.01 \
+        --kmer-length=7 \
+        --kmer-distance=2 \
+        --allowed-mismatches=10 \
+        --retry-reverse-complement \
+        --input-ref={input.reference} \
+        --output-fasta={output.alignment} \
+        --include-reference=true \
+        {input.sequences}
         """
 
 
@@ -246,7 +252,7 @@ rule tree:
         """
         augur tree \
             --alignment {input.alignment} \
-            --tree-builder-args="-czb" \
+            --tree-builder-args="-czb -o KX371887.3 -g config/constraint_tree.nwk" \
             --output {output.tree}
         """
 
