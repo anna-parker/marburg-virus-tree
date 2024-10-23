@@ -145,22 +145,31 @@ rule curate_dates:
 rule filter:
     message:
         """
-        Filtering out reference sequence
+        Filter out dropped strains, sequences with coverage 
+        under 0.1 and sequences that failed prealignment
         """
     input:
         sequences="data/sequences.fasta",
         metadata=rules.curate_dates.output.curated_metadata,
         exclude=dropped_strains,
+        prealigned_fasta="data/prealigned_sequences.fasta",
+        prealigned_tsv="data/prealigned_nextclade.tsv",
     output:
         filtered_sequences="data/filtered_sequences.fasta",
+        filtered_metadata="data/filtered_metadata.tsv",
+    params:
+        min_coverage=0.1,
     shell:
         """
-        augur filter \
-            --sequences {input.sequences} \
-            --metadata {input.metadata} \
-            --metadata-id-columns "genbankAccession" \
-            --exclude {input.exclude} \
-            --output-sequences {output.filtered_sequences}
+        python scripts/filter.py \
+            --all-sequences {input.sequences} \
+            --all-metadata {input.metadata} \
+            --dropped-strains {input.exclude} \
+            --prealigned-sequences {input.prealigned_fasta} \
+            --prealigned-tsv {input.prealigned_tsv} \
+            --output-sequences {output.filtered_sequences} \
+            --output-metadata {output.filtered_metadata} \
+            --min-coverage {params.min_coverage}
         """
 
 
@@ -169,6 +178,11 @@ rule align:
         """
         Aligning sequences to {input.reference}
           - filling gaps with N with
+        augur align \
+            --sequences {input.sequences} \
+            --reference-sequence {input.reference} \
+            --output {output.alignment} \
+            --fill-gaps
         """
     input:
         sequences=rules.filter.output.filtered_sequences,
@@ -177,11 +191,16 @@ rule align:
         alignment="data/aligned_sequence.fasta",
     shell:
         """
-        augur align \
-            --sequences {input.sequences} \
-            --reference-sequence {input.reference} \
-            --output {output.alignment} \
-            --fill-gaps
+        nextclade run \
+        --min-seed-cover=0.01 \
+        --kmer-length=7 \
+        --kmer-distance=2 \
+        --allowed-mismatches=10 \
+        --retry-reverse-complement \
+        --input-ref={input.reference} \
+        --output-fasta={output.alignment} \
+        --include-reference=true \
+        {input.sequences}
         """
 
 

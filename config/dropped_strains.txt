@@ -3,3 +3,4 @@ OK573192.1 #too diverged
 M36065.1 #too diverged
 OP729425.1 #too diverged
 OK573191.1 #too diverged for treetime estimates
+OK573188.1 #too diverged
