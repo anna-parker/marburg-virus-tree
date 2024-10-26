@@ -180,7 +180,7 @@ rule filter:
         filtered_sequences="data/filtered_sequences.fasta",
         filtered_metadata="data/filtered_metadata.tsv",
     params:
-        min_coverage=0.1,
+        min_coverage=0.001,
     shell:
         """
         python scripts/filter.py \
@@ -231,8 +231,11 @@ rule align:
         nextclade run \
         --min-seed-cover=0.01 \
         --kmer-length=7 \
-        --kmer-distance=2 \
         --allowed-mismatches=10 \
+        --penalty-gap-open=18 \
+        --penalty-gap-open-in-frame=18 \
+        --penalty-gap-open-out-of-frame=18 \
+        --gap-alignment-side=left \
         --retry-reverse-complement \
         --input-ref={input.reference} \
         --output-fasta={output.alignment} \
@@ -252,7 +255,7 @@ rule tree:
         """
         augur tree \
             --alignment {input.alignment} \
-            --tree-builder-args="-czb -o KX371887.3 -g config/constraint_tree.nwk" \
+            --tree-builder-args="-czb -o KX371887.3"\
             --output {output.tree}
         """
 
@@ -294,12 +297,32 @@ rule refine:
             --date-inference {params.date_inference} \
         """
 
+rule prune_root:
+    message:
+        "Pruning outgroup and root branch"
+    input:
+        tree=rules.refine.output.tree,
+        node_data=rules.refine.output.node_data,
+        scripts="scripts/prune_root.py",
+    output:
+        tree="data/tree_pruned.nwk",
+        node_data="data/branch_lengths_pruned.json",
+    shell:
+        """
+        python {input.scripts} \
+            --tree {input.tree} \
+            --outgroup-name {outgroup_name} \
+            --branch-lengths-json {input.node_data} \
+            --output-tree {output.tree} \
+            --output-branch-lengths-json {output.node_data} \
+        """
+
 
 rule ancestral:
     message:
         "Reconstructing ancestral sequences and mutations"
     input:
-        tree=rules.refine.output.tree,
+        tree=rules.prune_root.output.tree,
         alignment=rules.align.output,
         reference=reference,
     output:
@@ -321,7 +344,7 @@ rule translate:
     message:
         "Translating amino acid sequences"
     input:
-        tree=rules.refine.output.tree,
+        tree=rules.prune_root.output.tree,
         node_data=rules.ancestral.output.node_data,
         reference=reference_gff3,
     output:
@@ -340,7 +363,7 @@ rule clades:
     message:
         "Adding internal clade labels"
     input:
-        tree=rules.refine.output.tree,
+        tree=rules.prune_root.output.tree,
         aa_muts=rules.translate.output.node_data,
         nuc_muts=rules.ancestral.output.node_data,
         clades="config/clades.tsv",
@@ -360,7 +383,7 @@ rule traits:
     message:
         "Inferring ancestral traits for {params.columns!s}"
     input:
-        tree=rules.refine.output.tree,
+        tree=rules.prune_root.output.tree,
         metadata=rules.add_outgroup.output.metadata,
     output:
         node_data="data/traits.json",
@@ -382,16 +405,16 @@ rule export:
     message:
         "Exporting data files for for auspice"
     input:
-        tree=rules.refine.output.tree,
+        tree=rules.prune_root.output.tree,
         metadata=rules.add_outgroup.output.metadata,
-        branch_lengths=rules.refine.output.node_data,
+        branch_lengths=rules.prune_root.output.node_data,
         traits=rules.traits.output.node_data,
         nt_muts=rules.ancestral.output.node_data,
         aa_muts=rules.translate.output.node_data,
         auspice_config=auspice_config,
         clades=rules.clades.output.node_data,
     output:
-        auspice_json="data/marburg_tree.json",
+        auspice_json="auspice/marburg_tree.json",
     params:
         id_column="genbankAccession",
     shell:
@@ -406,20 +429,3 @@ rule export:
             --metadata-id-columns {params.id_column}
         """
 
-
-rule fix_auspice_tree:
-    message:
-        "Remove outgroup from tree and prune long root branch"
-    input:
-        auspice_tree=rules.export.output.auspice_json,
-    params:
-        outgroup=outgroup_name,
-    output:
-        auspice_tree="auspice/marburg_tree.json",
-    shell:
-        """
-        python scripts/fix_auspice_tree.py \
-            --auspice-tree {input.auspice_tree} \
-            --output-auspice-tree {output.auspice_tree} \
-            --outgroup-name {params.outgroup}
-        """
