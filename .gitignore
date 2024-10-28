@@ -1,2 +1,4 @@
 data/
 .snakemake
+treetime_range/
+examples/
