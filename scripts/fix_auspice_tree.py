@@ -34,38 +34,13 @@ def main(
     with open(auspice_tree, 'r') as file:
         data = json.load(file)
 
-    children = data['tree']['children']
-
-    # delete the outgroup
-    for i, child in enumerate(children):
-        if child["name"] == outgroup_name:
-            del children[i]
-            break
-
-    children = data['tree']['children']
-    assert len(children) == 1, f"Expected 1 child, got {len(children)}"
-    div = children[0]["node_attrs"]["div"]
-    time_first_inner_node =  children[0]["node_attrs"]["num_date"]["value"]
-    logger.info(f"First child has div:{div}, shrinking")
-    logger.info(f"First child has time:{time_first_inner_node}, shrinking")
-
-    # shrink long branch to root
-    data['tree']["node_attrs"]["num_date"]["value"] = time_first_inner_node - 10
-    data['tree']["node_attrs"]["num_date"]["confidence"] = [time_first_inner_node - 10, time_first_inner_node]
-
-    # remove div from all children
-    def traverse(node):
-        if 'children' in node:
-            for child in node['children']:
-                child['node_attrs']['div'] -= div
-                traverse(child)
-
-    traverse(data['tree'])
+    data['tree']['name'] = "Reconstructed Root using KX371887.3: Dianlovirus menglaense as Outgroup"
 
     with open(output_auspice_tree, 'w') as file:
         json.dump(data, file, indent=4)
 
-    print(f"Dropped {outgroup_name} successfully.")
+    print("Renamed root successfully.")
+
 
 
 if __name__ == "__main__":
