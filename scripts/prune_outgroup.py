@@ -22,7 +22,6 @@ logging.basicConfig(
 @click.option("--sequences", required=True, type=click.Path(exists=True))
 @click.option("--metadata", required=True, type=click.Path(exists=True))
 @click.option("--reconstructed-alignments", required=True, type=click.Path(exists=True))
-@click.option("--output-tree", required=True, type=click.Path())
 @click.option("--output-sequences", required=True, type=click.Path())
 @click.option("--output-metadata", required=True, type=click.Path())
 @click.option(
@@ -36,7 +35,6 @@ def main(
     sequences: str,
     metadata: str,
     reconstructed_alignments: str,
-    output_tree: str,
     output_sequences: str,
     output_metadata: str,
     log_level: str,
@@ -51,23 +49,12 @@ def main(
 
     if root_clades[0].name == outgroup_name:
         clade_to_keep = root_clades[1]
-        clade_to_delete = root_clades[0]
     else:
         clade_to_keep = root_clades[0]
-        clade_to_delete = root_clades[1]
 
     with open(reconstructed_alignments, 'r') as file:
         data = json.load(file)
     reconstructed_sequence = data['nodes'][clade_to_keep.name]['sequence']
-
-    tree.root.clades.remove(clade_to_delete)
-    clade_to_keep.branch_length = 0
-    tree.root.branch_length = 0
-    clade_to_keep.name = reconstructed_sequence_name
-
-    Phylo.write(clade_to_keep, output_tree, "newick")
-    logger.info(f"Dropped outgroup {outgroup_name} successfully from .nwk.")
-
 
     with open(output_sequences, "w", encoding="utf-8") as output_file:
         with open(sequences, encoding="utf-8") as f_in:

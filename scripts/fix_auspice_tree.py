@@ -34,7 +34,15 @@ def main(
     with open(auspice_tree, 'r') as file:
         data = json.load(file)
 
-    data['tree']['name'] = "Reconstructed Root using KX371887.3: Dianlovirus menglaense as Outgroup"
+    children = data['tree']['children']
+    # delete the outgroup
+    for i, child in enumerate(children):
+        if child["name"] == outgroup_name:
+            #del children[i]
+            child['name'] = "Reconstructed Root using KX371887.3: Dianlovirus menglaense as Outgroup"
+            break
+
+    #data['tree']['name'] = "Reconstructed Root using KX371887.3: Dianlovirus menglaense as Outgroup"
 
     with open(output_auspice_tree, 'w') as file:
         json.dump(data, file, indent=4)

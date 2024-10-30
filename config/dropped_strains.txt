@@ -4,3 +4,8 @@ M36065.1 #too diverged
 OP729425.1 #too diverged
 OK573191.1 #too diverged for treetime estimates
 OK573188.1 #too diverged
+OK572969.1 # missing country, high divergence
+OK573003.1 # missing country, high divergence
+OK572967.1 # missing country, high divergence
+OK572966.1 # missing country, high divergence
+OK573190.1 # high divergence
