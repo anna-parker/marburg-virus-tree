@@ -318,7 +318,7 @@ rule preancestral:
         """
 
 
-rule prune_root:
+rule prune_outgroup:
     message:
         "Pruning outgroup and root branch"
     input:
@@ -326,9 +326,8 @@ rule prune_root:
         alignment=rules.align.output,
         metadata=rules.add_outgroup.output.metadata,
         node_data=rules.preancestral.output.node_data,
-        scripts="scripts/prune_root.py",
+        scripts="scripts/prune_outgroup.py",
     output:
-        tree="data/tree_pruned.nwk",
         alignment="data/aligned_sequences_pruned.fasta",
         metadata="data/metadata_pruned.tsv",
     shell:
@@ -339,9 +338,23 @@ rule prune_root:
             --sequences {input.alignment} \
             --metadata {input.metadata} \
             --reconstructed-alignments {input.node_data} \
-            --output-tree {output.tree} \
             --output-sequences {output.alignment} \
             --output-metadata {output.metadata} \
+        """
+
+rule rooted_tree:
+    message:
+        "Build tree with reconstructed root"
+    input:
+        alignment=rules.prune_outgroup.output.alignment,
+    output:
+        tree="data/rooted_tree.nwk",
+    shell:
+        """
+        augur tree \
+            --alignment {input.alignment} \
+            --tree-builder-args="-czb -o ReconstructedRoot"\
+            --output {output.tree}
         """
 
 
@@ -355,15 +368,16 @@ rule refine:
         Papers estimate the clock rate at 3.3e-4 subs/site/year
         """
     input:
-        tree=rules.prune_root.output.tree,
-        alignment=rules.prune_root.output.alignment,
-        metadata=rules.prune_root.output.metadata,
+        tree=rules.rooted_tree.output.tree,
+        alignment=rules.prune_outgroup.output.alignment,
+        metadata=rules.prune_outgroup.output.metadata,
     output:
         tree="data/tree.nwk",
         node_data="data/branch_lengths.json",
     params:
         coalescent="opt",
         date_inference="marginal",
+        root="ReconstructedRoot"
     shell:
         """
         augur refine \
@@ -374,6 +388,7 @@ rule refine:
             --output-node-data {output.node_data} \
             --metadata-id-columns genbankAccession \
             --coalescent {params.coalescent} \
+            --root {params.root} \
             --timetree --max-iter 4 \
             --date-confidence \
             --clock-rate 3.3e-4 \
@@ -386,7 +401,7 @@ rule ancestral:
         "Reconstructing ancestral sequences and mutations"
     input:
         tree=rules.refine.output.tree,
-        alignment=rules.prune_root.output.alignment,
+        alignment=rules.prune_outgroup.output.alignment,
         reference=reference,
     output:
         node_data="data/nt_muts.json",
@@ -447,7 +462,7 @@ rule traits:
         "Inferring ancestral traits for {params.columns!s}"
     input:
         tree=rules.refine.output.tree,
-        metadata=rules.prune_root.output.metadata,
+        metadata=rules.prune_outgroup.output.metadata,
     output:
         node_data="data/traits.json",
     params:
@@ -469,7 +484,7 @@ rule export:
         "Exporting data files for for auspice"
     input:
         tree=rules.refine.output.tree,
-        metadata=rules.prune_root.output.metadata,
+        metadata=rules.prune_outgroup.output.metadata,
         branch_lengths=rules.refine.output.node_data,
         traits=rules.traits.output.node_data,
         nt_muts=rules.ancestral.output.node_data,
@@ -498,7 +513,7 @@ rule fix_auspice_tree:
     input:
         auspice_tree=rules.export.output.auspice_json,
     params:
-        outgroup=outgroup_name,
+        outgroup="ReconstructedRoot",
     output:
         auspice_tree="auspice/marburg_tree.json",
     shell:
