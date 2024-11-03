@@ -13,6 +13,11 @@
             "name": "clade_membership",
             "displayName": "Clade",
             "description": ""
+          },
+          {
+            "name": "lineage",
+            "displayName": "Lineage",
+            "description": ""
           }
         ]
       }
@@ -24,13 +29,8 @@
         "type": "categorical"
       },
       {
-        "key": "numdate",
-        "title": "Date",
-        "type": "continuous"
-      },
-      {
-        "key": "raw_date",
-        "title": "Reported Collection Date",
+        "key": "lineage",
+        "title": "Lineage",
         "type": "categorical"
       },
       {
@@ -55,7 +55,7 @@
       },
       {
         "key": "clade_membership",
-        "title": "clade",
+        "title": "Clade",
         "type": "categorical"
       }
     ],
@@ -75,6 +75,7 @@
     "filters": [
       "country",
       "ncbiGeoRegion",
+      "lineage",
       "author",
       "clade_membership"
     ]
