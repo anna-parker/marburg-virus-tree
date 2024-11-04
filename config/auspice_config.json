@@ -10,11 +10,6 @@
       "nextclade": {
         "clade_node_attrs": [
           {
-            "name": "clade_membership",
-            "displayName": "Clade",
-            "description": ""
-          },
-          {
             "name": "lineage",
             "displayName": "Lineage",
             "description": ""
@@ -81,6 +76,7 @@
       "country",
       "ncbiGeoRegion",
       "lineage",
+      "clade",
       "author",
       "clade_membership"
     ]
