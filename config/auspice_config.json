@@ -39,6 +39,11 @@
         "type": "categorical"
       },
       {
+        "key": "ncbiHostName",
+        "title": "Host",
+        "type": "categorical"
+      },
+      {
         "key": "country",
         "title": "Country",
         "type": "categorical"
