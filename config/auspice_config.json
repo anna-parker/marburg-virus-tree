@@ -14,7 +14,11 @@
             "displayName": "Lineage",
             "description": ""
           }
-        ]
+        ],
+        "ref_nodes":
+          {
+            "default":  "__clade_founder__"
+          }
       }
     },
     "colorings": [
